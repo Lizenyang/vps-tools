@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =========================================================
-# 个人专属运维脚本 - Integer Edition v1.2
+# 个人专属运维脚本 - Integer Edition v1.3
 # 适配: Debian/Ubuntu/CentOS/Armbian/macOS/Windows(GitBash)
 # =========================================================
 
@@ -163,54 +163,101 @@ kill_tmux() {
     echo -e "${GREEN}Tmux 会话已清空。${PLAIN}"
 }
 
-# 16. 添加公钥 (New)
+# 16. 添加公钥
 add_ssh_key() {
     if [[ "$OS_TYPE" == "windows" || "$OS_TYPE" == "macos" ]]; then
         echo -e "${RED}此功能依赖 Linux 特性(chattr)，不支持 Windows/macOS。${PLAIN}"
         return
     fi
-    
-    # 检查 chattr 是否存在，不存在尝试安装 e2fsprogs
     if ! command -v chattr &> /dev/null; then
         echo -e "${YELLOW}未检测到 chattr 命令，尝试安装依赖...${PLAIN}"
         install_pkg e2fsprogs e2fsprogs e2fsprogs
     fi
-
     local MY_KEY="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDF8diyCdxXtq4hnWps7ppjEi0TQcxm/rb+0sjxux2t3gE+299JchpXx+0+1pw5AV/o58ebCNeb6FsjpfLCNIeNxO82kK1/hOgxrlp99hNenCTfZwlAahlB1KnjwdjA11+8temBEioFWN8AO4E6iOjIbbCTteAQhRNXNbpJwWfZHX2O0aNw1Q9JjAfOOT1dKl8C4KKdODhkPGz6M81Xi+oFFh9N0Mq2VqjZ6bQr4DLa8QH2WAEwYYC6GngQthtnTDLPKaqpyF3p5nVSDQ7Z+iKBdftBjNNreq+j0jE2o+iDDUetYWbt8chaZabHtrUODhTmd+vpUhEQWnEPKXKnOvX0hHlFeKgKUlgu7CrDGiqXnJ7oew8zZbLLJfEL1Zac3nFZUObDpzXV0LXemn+OkK1nyJ36UlwZgHfLNrPY6vh3ZEGdD0nhcn2VNELlNp8fv7O10CtiSa4adwNsUMk8lHauR/hiogrRwK7sEn/ze5DAheWO3i+22a+EDPlIKQkEgID7FmKTL7kD0Z5r/Vs2L3lKgJQJ7bCnDoYDcj8mKlzlUezNdoLA/l758keONlzOpwVFfLwQqbI369tb3yRfuwN9vOYfNqSGdv/IRZ/QL614DQ2RZeZKPo2RWDq/KxAautgTQTiodGZZrkxs4Y8W0/l8+/1cFN+BaN/6FB76QNkxBQ== my_vps_key"
-
     echo -e "${YELLOW}正在处理 SSH 公钥...${PLAIN}"
-
-    # 1. 准备工作
     mkdir -p /root/.ssh
-
-    # 2. 暴力解锁
     chattr -ia /root/.ssh 2>/dev/null
     chattr -ia /root/.ssh/authorized_keys 2>/dev/null
-
-    # 3. 写入公钥
     if ! grep -q "$MY_KEY" /root/.ssh/authorized_keys 2>/dev/null; then
         echo "$MY_KEY" >> /root/.ssh/authorized_keys
         echo -e "${GREEN}✅ 公钥已写入${PLAIN}"
     else
         echo -e "${YELLOW}⚠️ 公钥已存在，跳过${PLAIN}"
     fi
-
-    # 4. 修正权限
     chmod 700 /root/.ssh
     chmod 600 /root/.ssh/authorized_keys
-
-    # 5. 暴力上锁
     chattr +i /root/.ssh/authorized_keys
     chattr +i /root/.ssh
-
     echo -e "${GREEN}🎉 搞定！SSH 目录已加锁保护。${PLAIN}"
+}
+
+# 17. 哪吒探针 + 伪装 (New)
+install_nezha_stealth() {
+    if [[ "$OS_TYPE" == "windows" || "$OS_TYPE" == "macos" ]]; then
+        echo -e "${RED}此功能依赖 Systemd，仅支持 Linux。${PLAIN}"
+        return
+    fi
+
+    # 配置区域
+    local NEW_NAME="systemd-private"
+    
+    echo -e "${YELLOW}正在执行哪吒探针安装 + 进程伪装 (${NEW_NAME})...${PLAIN}"
+    
+    # 1. 执行安装
+    curl -L https://raw.githubusercontent.com/nezhahq/scripts/main/agent/install.sh -o agent.sh && chmod +x agent.sh && env NZ_SERVER=152.69.218.38:8008 NZ_TLS=false NZ_CLIENT_SECRET=5PYr2moxoVfay9rlLet3QwbH6PjTknkI ./agent.sh
+
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}安装失败，请检查网络或配置参数。${PLAIN}"
+        return
+    fi
+
+    echo -e "${GREEN}安装命令完毕，等待服务初始化(5s)...${PLAIN}"
+    sleep 5 
+
+    # 2. 执行伪装
+    local SERVICE_FILE="/etc/systemd/system/nezha-agent.service"
+    local AGENT_DIR="/opt/nezha/agent"
+    local ORIGIN_BIN="$AGENT_DIR/nezha-agent"
+    local NEW_BIN="$AGENT_DIR/$NEW_NAME"
+
+    systemctl stop nezha-agent
+
+    # 重命名二进制
+    if [ -f "$ORIGIN_BIN" ]; then
+        mv "$ORIGIN_BIN" "$NEW_BIN"
+        echo -e "${GREEN}已重命名二进制文件${PLAIN}"
+    elif [ -f "$NEW_BIN" ]; then
+        echo -e "${YELLOW}目标文件已存在，跳过重命名${PLAIN}"
+    else
+        echo -e "${RED}未找到探针文件，安装可能未成功！${PLAIN}"
+        return
+    fi
+
+    # 修改 Systemd
+    if [ -f "$SERVICE_FILE" ]; then
+        sed -i "s|/opt/nezha/agent/nezha-agent|/opt/nezha/agent/$NEW_NAME|g" "$SERVICE_FILE"
+        echo -e "${GREEN}已修改 Systemd 引导配置${PLAIN}"
+    else
+        echo -e "${RED}未找到服务配置文件${PLAIN}"
+        return
+    fi
+
+    # 3. 重启与清理
+    systemctl daemon-reload
+    systemctl start nezha-agent
+    rm -f agent.sh
+
+    echo -e "${GREEN}🎉 伪装完成！进程名已改为: $NEW_NAME${PLAIN}"
+    echo -e "-------------------------------------------------"
+    ps aux | grep "$NEW_NAME" | grep -v grep
+    echo -e "-------------------------------------------------"
 }
 
 # --- 菜单界面 ---
 show_menu() {
     clear
     echo -e "${BLUE}################################################${PLAIN}"
-    echo -e "${BLUE}#            个人专属运维脚本 v1.2             #${PLAIN}"
+    echo -e "${BLUE}#            个人专属运维脚本 v1.3             #${PLAIN}"
     echo -e "${BLUE}#        System: ${OS_TYPE}  Arch: ${ARCH}          #${PLAIN}"
     echo -e "${BLUE}################################################${PLAIN}"
     echo -e ""
@@ -239,37 +286,8 @@ show_menu() {
     echo -e " ${GREEN}14.${PLAIN} 安装基础工具 (nmap/tmux/nc...)"
     echo -e " ${GREEN}15.${PLAIN} 杀掉所有 Tmux 会话"
     echo -e " ${GREEN}16.${PLAIN} 一键添加公钥 (防篡改)"
+    echo -e " ${GREEN}17.${PLAIN} 一键上针并改进程名称"
     echo -e ""
     echo -e " ${GREEN}0.${PLAIN} 退出"
     echo -e ""
-    read -p "请输入数字 [0-16]: " choice
-
-    case $choice in
-        1) run_kejilion_global ;;
-        2) run_kejilion_cn ;;
-        3) mod_dns ;;
-        4) check_lastb ;;
-        5) find_big_files ;;
-        6) oracle_firewall ;;
-        7) install_fail2ban ;;
-        8) install_3xui ;;
-        9) install_traff_x64 ;;
-        10) install_traff_arm ;;
-        11) install_xboard ;;
-        12) install_v2bx_backend ;;
-        13) goto_v2bx_dir ;;
-        14) install_ssh_tools ;;
-        15) kill_tmux ;;
-        16) add_ssh_key ;;
-        0) exit 0 ;;
-        *) echo -e "${RED}输入错误，请输入 0-16 之间的数字${PLAIN}" ;;
-    esac
-    
-    echo -e ""
-    read -p "按回车继续..." 
-    show_menu
-}
-
-# --- 入口 ---
-pre_check
-show_menu
+    read -p "请输入数字 [0-17]: " choice
