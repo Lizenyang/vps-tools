@@ -291,3 +291,34 @@ show_menu() {
     echo -e " ${GREEN}0.${PLAIN} 退出"
     echo -e ""
     read -p "请输入数字 [0-17]: " choice
+
+    case $choice in
+        1) run_kejilion_global ;;
+        2) run_kejilion_cn ;;
+        3) mod_dns ;;
+        4) check_lastb ;;
+        5) find_big_files ;;
+        6) oracle_firewall ;;
+        7) install_fail2ban ;;
+        8) install_3xui ;;
+        9) install_traff_x64 ;;
+        10) install_traff_arm ;;
+        11) install_xboard ;;
+        12) install_v2bx_backend ;;
+        13) goto_v2bx_dir ;;
+        14) install_ssh_tools ;;
+        15) kill_tmux ;;
+        16) add_ssh_key ;;
+        17) install_nezha_stealth ;;
+        0) exit 0 ;;
+        *) echo -e "${RED}输入错误，请输入 0-17 之间的数字${PLAIN}" ;;
+    esac
+    
+    echo -e ""
+    read -p "按回车继续..." 
+    show_menu
+}
+
+# --- 入口 ---
+pre_check
+show_menu
