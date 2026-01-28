@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # =========================================================
-# 个人专属运维脚本 - Integer Edition v1.3 (Fixed)
+# 个人专属运维脚本 - Integer Edition v1.4
+# 适配: Debian/Ubuntu/CentOS/Armbian/macOS/Windows(GitBash)
 # =========================================================
 
 # --- 颜色定义 ---
@@ -204,11 +205,29 @@ install_nezha_stealth() {
     echo -e "${GREEN}🎉 伪装完成！进程名: $NEW_NAME${PLAIN}"
 }
 
+# 18. 清理痕迹 (New)
+clean_traces() {
+    echo -e "${YELLOW}正在清理命令历史记录...${PLAIN}"
+    
+    # 1. 清空当前内存记录
+    history -c
+    
+    # 2. 清空硬盘记录文件
+    > ~/.bash_history
+    
+    # 额外：如果有 Zsh 或 MySQL 历史，顺手也清了
+    if [ -f ~/.zsh_history ]; then > ~/.zsh_history; fi
+    if [ -f ~/.mysql_history ]; then > ~/.mysql_history; fi
+    
+    echo -e "${GREEN}✅ 历史记录文件已清空。${PLAIN}"
+    echo -e "${YELLOW}注意: 为确保内存缓存彻底清除，建议您立即断开 SSH 并重新登录。${PLAIN}"
+}
+
 # --- 菜单界面 ---
 show_menu() {
     clear
     echo -e "${BLUE}################################################${PLAIN}"
-    echo -e "${BLUE}#            个人专属运维脚本 v1.3             #${PLAIN}"
+    echo -e "${BLUE}#            个人专属运维脚本 v1.4             #${PLAIN}"
     echo -e "${BLUE}#        System: ${OS_TYPE}  Arch: ${ARCH}          #${PLAIN}"
     echo -e "${BLUE}################################################${PLAIN}"
     echo -e ""
@@ -229,9 +248,10 @@ show_menu() {
     echo -e " ${GREEN}15.${PLAIN} 杀掉所有 Tmux"
     echo -e " ${GREEN}16.${PLAIN} 一键添加公钥"
     echo -e " ${GREEN}17.${PLAIN} 一键上针+伪装"
+    echo -e " ${GREEN}18.${PLAIN} 清理痕迹 (History)"
     echo -e " ${GREEN}0.${PLAIN} 退出"
     echo -e ""
-    read -p "请输入数字 [0-17]: " choice
+    read -p "请输入数字 [0-18]: " choice
 
     case $choice in
         1) run_kejilion_global ;;
@@ -251,6 +271,7 @@ show_menu() {
         15) kill_tmux ;;
         16) add_ssh_key ;;
         17) install_nezha_stealth ;;
+        18) clean_traces ;;
         0) exit 0 ;;
         *) echo -e "${RED}错误输入${PLAIN}" ;;
     esac
