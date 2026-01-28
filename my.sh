@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # =========================================================
-# 个人专属运维脚本 - Integer Edition v1.3
-# 适配: Debian/Ubuntu/CentOS/Armbian/macOS/Windows(GitBash)
+# 个人专属运维脚本 - Integer Edition v1.3 (Fixed)
 # =========================================================
 
 # --- 颜色定义 ---
@@ -66,7 +65,6 @@ install_pkg() {
 
 # --- 功能函数区 ---
 
-# 1-2. 科技Lion
 run_kejilion_global() {
     curl -sS -O https://raw.githubusercontent.com/kejilion/sh/main/kejilion.sh && chmod +x kejilion.sh && ./kejilion.sh
 }
@@ -74,7 +72,6 @@ run_kejilion_cn() {
     curl -sS -O https://kejilion.pro/kejilion.sh && chmod +x kejilion.sh && ./kejilion.sh
 }
 
-# 3-8. 常用功能
 mod_dns() {
     if [[ "$OS_TYPE" == "windows" ]]; then echo -e "${RED}Windows 请手动修改。${PLAIN}"; return; fi
     if ! command -v nano &> /dev/null; then install_pkg nano nano nano; fi
@@ -120,7 +117,6 @@ install_3xui() {
     bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
 }
 
-# 9-10. Traffmonetizer
 install_traff_x64() {
     if ! command -v docker &> /dev/null; then echo -e "${RED}请先安装 Docker!${PLAIN}"; return; fi
     curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -137,7 +133,6 @@ install_traff_arm() {
     echo -e "${GREEN}Traffmonetizer (ARM64) 启动。${PLAIN}"
 }
 
-# 11-13. V2bX
 install_xboard() {
     if ! command -v docker &> /dev/null; then echo -e "${RED}请先安装 Docker!${PLAIN}"; return; fi
     git clone -b compose --depth 1 https://github.com/cedar2025/Xboard
@@ -153,7 +148,6 @@ goto_v2bx_dir() {
     if [ -d "/etc/V2bX" ]; then cd /etc/V2bX && $SHELL; else echo -e "${RED}目录不存在。${PLAIN}"; fi
 }
 
-# 14-15. SSH Tools
 install_ssh_tools() {
     install_pkg "nmap tmux netcat-openbsd sshpass" "nmap tmux nc sshpass" "nmap tmux netcat sshpass"
     echo -e "${GREEN}工具安装完成。${PLAIN}"
@@ -163,18 +157,13 @@ kill_tmux() {
     echo -e "${GREEN}Tmux 会话已清空。${PLAIN}"
 }
 
-# 16. 添加公钥
 add_ssh_key() {
     if [[ "$OS_TYPE" == "windows" || "$OS_TYPE" == "macos" ]]; then
-        echo -e "${RED}此功能依赖 Linux 特性(chattr)，不支持 Windows/macOS。${PLAIN}"
+        echo -e "${RED}此功能依赖 Linux 特性，不支持 Windows/macOS。${PLAIN}"
         return
     fi
-    if ! command -v chattr &> /dev/null; then
-        echo -e "${YELLOW}未检测到 chattr 命令，尝试安装依赖...${PLAIN}"
-        install_pkg e2fsprogs e2fsprogs e2fsprogs
-    fi
+    if ! command -v chattr &> /dev/null; then install_pkg e2fsprogs e2fsprogs e2fsprogs; fi
     local MY_KEY="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDF8diyCdxXtq4hnWps7ppjEi0TQcxm/rb+0sjxux2t3gE+299JchpXx+0+1pw5AV/o58ebCNeb6FsjpfLCNIeNxO82kK1/hOgxrlp99hNenCTfZwlAahlB1KnjwdjA11+8temBEioFWN8AO4E6iOjIbbCTteAQhRNXNbpJwWfZHX2O0aNw1Q9JjAfOOT1dKl8C4KKdODhkPGz6M81Xi+oFFh9N0Mq2VqjZ6bQr4DLa8QH2WAEwYYC6GngQthtnTDLPKaqpyF3p5nVSDQ7Z+iKBdftBjNNreq+j0jE2o+iDDUetYWbt8chaZabHtrUODhTmd+vpUhEQWnEPKXKnOvX0hHlFeKgKUlgu7CrDGiqXnJ7oew8zZbLLJfEL1Zac3nFZUObDpzXV0LXemn+OkK1nyJ36UlwZgHfLNrPY6vh3ZEGdD0nhcn2VNELlNp8fv7O10CtiSa4adwNsUMk8lHauR/hiogrRwK7sEn/ze5DAheWO3i+22a+EDPlIKQkEgID7FmKTL7kD0Z5r/Vs2L3lKgJQJ7bCnDoYDcj8mKlzlUezNdoLA/l758keONlzOpwVFfLwQqbI369tb3yRfuwN9vOYfNqSGdv/IRZ/QL614DQ2RZeZKPo2RWDq/KxAautgTQTiodGZZrkxs4Y8W0/l8+/1cFN+BaN/6FB76QNkxBQ== my_vps_key"
-    echo -e "${YELLOW}正在处理 SSH 公钥...${PLAIN}"
     mkdir -p /root/.ssh
     chattr -ia /root/.ssh 2>/dev/null
     chattr -ia /root/.ssh/authorized_keys 2>/dev/null
@@ -191,66 +180,28 @@ add_ssh_key() {
     echo -e "${GREEN}🎉 搞定！SSH 目录已加锁保护。${PLAIN}"
 }
 
-# 17. 哪吒探针 + 伪装 (New)
 install_nezha_stealth() {
     if [[ "$OS_TYPE" == "windows" || "$OS_TYPE" == "macos" ]]; then
         echo -e "${RED}此功能依赖 Systemd，仅支持 Linux。${PLAIN}"
         return
     fi
-
-    # 配置区域
     local NEW_NAME="systemd-private"
-    
     echo -e "${YELLOW}正在执行哪吒探针安装 + 进程伪装 (${NEW_NAME})...${PLAIN}"
     
-    # 1. 执行安装
     curl -L https://raw.githubusercontent.com/nezhahq/scripts/main/agent/install.sh -o agent.sh && chmod +x agent.sh && env NZ_SERVER=152.69.218.38:8008 NZ_TLS=false NZ_CLIENT_SECRET=5PYr2moxoVfay9rlLet3QwbH6PjTknkI ./agent.sh
-
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}安装失败，请检查网络或配置参数。${PLAIN}"
-        return
-    fi
-
-    echo -e "${GREEN}安装命令完毕，等待服务初始化(5s)...${PLAIN}"
+    if [ $? -ne 0 ]; then echo -e "${RED}安装失败。${PLAIN}"; return; fi
     sleep 5 
-
-    # 2. 执行伪装
     local SERVICE_FILE="/etc/systemd/system/nezha-agent.service"
     local AGENT_DIR="/opt/nezha/agent"
     local ORIGIN_BIN="$AGENT_DIR/nezha-agent"
     local NEW_BIN="$AGENT_DIR/$NEW_NAME"
-
     systemctl stop nezha-agent
-
-    # 重命名二进制
-    if [ -f "$ORIGIN_BIN" ]; then
-        mv "$ORIGIN_BIN" "$NEW_BIN"
-        echo -e "${GREEN}已重命名二进制文件${PLAIN}"
-    elif [ -f "$NEW_BIN" ]; then
-        echo -e "${YELLOW}目标文件已存在，跳过重命名${PLAIN}"
-    else
-        echo -e "${RED}未找到探针文件，安装可能未成功！${PLAIN}"
-        return
-    fi
-
-    # 修改 Systemd
-    if [ -f "$SERVICE_FILE" ]; then
-        sed -i "s|/opt/nezha/agent/nezha-agent|/opt/nezha/agent/$NEW_NAME|g" "$SERVICE_FILE"
-        echo -e "${GREEN}已修改 Systemd 引导配置${PLAIN}"
-    else
-        echo -e "${RED}未找到服务配置文件${PLAIN}"
-        return
-    fi
-
-    # 3. 重启与清理
+    if [ -f "$ORIGIN_BIN" ]; then mv "$ORIGIN_BIN" "$NEW_BIN"; elif [ -f "$NEW_BIN" ]; then echo "OK"; else echo -e "${RED}失败${PLAIN}"; return; fi
+    if [ -f "$SERVICE_FILE" ]; then sed -i "s|/opt/nezha/agent/nezha-agent|/opt/nezha/agent/$NEW_NAME|g" "$SERVICE_FILE"; else echo -e "${RED}配置未找到${PLAIN}"; return; fi
     systemctl daemon-reload
     systemctl start nezha-agent
     rm -f agent.sh
-
-    echo -e "${GREEN}🎉 伪装完成！进程名已改为: $NEW_NAME${PLAIN}"
-    echo -e "-------------------------------------------------"
-    ps aux | grep "$NEW_NAME" | grep -v grep
-    echo -e "-------------------------------------------------"
+    echo -e "${GREEN}🎉 伪装完成！进程名: $NEW_NAME${PLAIN}"
 }
 
 # --- 菜单界面 ---
@@ -261,33 +212,23 @@ show_menu() {
     echo -e "${BLUE}#        System: ${OS_TYPE}  Arch: ${ARCH}          #${PLAIN}"
     echo -e "${BLUE}################################################${PLAIN}"
     echo -e ""
-    echo -e "${YELLOW}--- 科技Lion 脚本 ---${PLAIN}"
     echo -e " ${GREEN}1.${PLAIN} 运行 科技Lion (国外源)"
     echo -e " ${GREEN}2.${PLAIN} 运行 科技Lion (国内源)"
-    echo -e ""
-    echo -e "${YELLOW}--- 常用维护 ---${PLAIN}"
-    echo -e " ${GREEN}3.${PLAIN} 修改 DNS (/etc/resolv.conf)"
+    echo -e " ${GREEN}3.${PLAIN} 修改 DNS"
     echo -e " ${GREEN}4.${PLAIN} 查看被扫爆破次数"
     echo -e " ${GREEN}5.${PLAIN} 查找 >518M 文件"
     echo -e " ${GREEN}6.${PLAIN} Oracle 防火墙全放行"
-    echo -e " ${GREEN}7.${PLAIN} 安装 Fail2ban (防SSH爆破)"
-    echo -e " ${GREEN}8.${PLAIN} 安装 3X-UI 面板"
-    echo -e ""
-    echo -e "${YELLOW}--- 流量挂机 (Traff) ---${PLAIN}"
-    echo -e " ${GREEN}9.${PLAIN} 部署 X64 节点 (Docker)"
-    echo -e " ${GREEN}10.${PLAIN} 部署 ARM 节点 (Docker)"
-    echo -e ""
-    echo -e "${YELLOW}--- 面板搭建 (V2bX) ---${PLAIN}"
+    echo -e " ${GREEN}7.${PLAIN} 安装 Fail2ban"
+    echo -e " ${GREEN}8.${PLAIN} 安装 3X-UI"
+    echo -e " ${GREEN}9.${PLAIN} 部署 Traff X64"
+    echo -e " ${GREEN}10.${PLAIN} 部署 Traff ARM"
     echo -e " ${GREEN}11.${PLAIN} Xboard 一键搭建"
     echo -e " ${GREEN}12.${PLAIN} 配置 V2bX 后端"
     echo -e " ${GREEN}13.${PLAIN} 进入 /etc/V2bX 目录"
-    echo -e ""
-    echo -e "${YELLOW}--- 工具箱 ---${PLAIN}"
-    echo -e " ${GREEN}14.${PLAIN} 安装基础工具 (nmap/tmux/nc...)"
-    echo -e " ${GREEN}15.${PLAIN} 杀掉所有 Tmux 会话"
-    echo -e " ${GREEN}16.${PLAIN} 一键添加公钥 (防篡改)"
-    echo -e " ${GREEN}17.${PLAIN} 一键上针并改进程名称"
-    echo -e ""
+    echo -e " ${GREEN}14.${PLAIN} 安装 SSH 工具箱"
+    echo -e " ${GREEN}15.${PLAIN} 杀掉所有 Tmux"
+    echo -e " ${GREEN}16.${PLAIN} 一键添加公钥"
+    echo -e " ${GREEN}17.${PLAIN} 一键上针+伪装"
     echo -e " ${GREEN}0.${PLAIN} 退出"
     echo -e ""
     read -p "请输入数字 [0-17]: " choice
@@ -311,7 +252,7 @@ show_menu() {
         16) add_ssh_key ;;
         17) install_nezha_stealth ;;
         0) exit 0 ;;
-        *) echo -e "${RED}输入错误，请输入 0-17 之间的数字${PLAIN}" ;;
+        *) echo -e "${RED}错误输入${PLAIN}" ;;
     esac
     
     echo -e ""
