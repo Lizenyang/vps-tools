@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =========================================================
-# 个人专属运维脚本 - Integer Edition v1.4
+# 个人专属运维脚本 - Integer Edition v1.5
 # 适配: Debian/Ubuntu/CentOS/Armbian/macOS/Windows(GitBash)
 # =========================================================
 
@@ -158,27 +158,83 @@ kill_tmux() {
     echo -e "${GREEN}Tmux 会话已清空。${PLAIN}"
 }
 
+# 16. 添加公钥并强化配置
 add_ssh_key() {
     if [[ "$OS_TYPE" == "windows" || "$OS_TYPE" == "macos" ]]; then
-        echo -e "${RED}此功能依赖 Linux 特性，不支持 Windows/macOS。${PLAIN}"
+        echo -e "${RED}此功能涉及修改系统 SSHD 配置，仅支持 Linux。${PLAIN}"
         return
     fi
-    if ! command -v chattr &> /dev/null; then install_pkg e2fsprogs e2fsprogs e2fsprogs; fi
-    local MY_KEY="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDF8diyCdxXtq4hnWps7ppjEi0TQcxm/rb+0sjxux2t3gE+299JchpXx+0+1pw5AV/o58ebCNeb6FsjpfLCNIeNxO82kK1/hOgxrlp99hNenCTfZwlAahlB1KnjwdjA11+8temBEioFWN8AO4E6iOjIbbCTteAQhRNXNbpJwWfZHX2O0aNw1Q9JjAfOOT1dKl8C4KKdODhkPGz6M81Xi+oFFh9N0Mq2VqjZ6bQr4DLa8QH2WAEwYYC6GngQthtnTDLPKaqpyF3p5nVSDQ7Z+iKBdftBjNNreq+j0jE2o+iDDUetYWbt8chaZabHtrUODhTmd+vpUhEQWnEPKXKnOvX0hHlFeKgKUlgu7CrDGiqXnJ7oew8zZbLLJfEL1Zac3nFZUObDpzXV0LXemn+OkK1nyJ36UlwZgHfLNrPY6vh3ZEGdD0nhcn2VNELlNp8fv7O10CtiSa4adwNsUMk8lHauR/hiogrRwK7sEn/ze5DAheWO3i+22a+EDPlIKQkEgID7FmKTL7kD0Z5r/Vs2L3lKgJQJ7bCnDoYDcj8mKlzlUezNdoLA/l758keONlzOpwVFfLwQqbI369tb3yRfuwN9vOYfNqSGdv/IRZ/QL614DQ2RZeZKPo2RWDq/KxAautgTQTiodGZZrkxs4Y8W0/l8+/1cFN+BaN/6FB76QNkxBQ== my_vps_key"
-    mkdir -p /root/.ssh
-    chattr -ia /root/.ssh 2>/dev/null
-    chattr -ia /root/.ssh/authorized_keys 2>/dev/null
-    if ! grep -q "$MY_KEY" /root/.ssh/authorized_keys 2>/dev/null; then
-        echo "$MY_KEY" >> /root/.ssh/authorized_keys
-        echo -e "${GREEN}✅ 公钥已写入${PLAIN}"
-    else
-        echo -e "${YELLOW}⚠️ 公钥已存在，跳过${PLAIN}"
+
+    # 公钥配置
+    local YOUR_PUBLIC_KEY="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDF8diyCdxXtq4hnWps7ppjEi0TQcxm/rb+0sjxux2t3gE+299JchpXx+0+1pw5AV/o58ebCNeb6FsjpfLCNIeNxO82kK1/hOgxrlp99hNenCTfZwlAahlB1KnjwdjA11+8temBEioFWN8AO4E6iOjIbbCTteAQhRNXNbpJwWfZHX2O0aNw1Q9JjAfOOT1dKl8C4KKdODhkPGz6M81Xi+oFFh9N0Mq2VqjZ6bQr4DLa8QH2WAEwYYC6GngQthtnTDLPKaqpyF3p5nVSDQ7Z+iKBdftBjNNreq+j0jE2o+iDDUetYWbt8chaZabHtrUODhTmd+vpUhEQWnEPKXKnOvX0hHlFeKgKUlgu7CrDGiqXnJ7oew8zZbLLJfEL1Zac3nFZUObDpzXV0LXemn+OkK1nyJ36UlwZgHfLNrPY6vh3ZEGdD0nhcn2VNELlNp8fv7O10CtiSa4adwNsUMk8lHauR/hiogrRwK7sEn/ze5DAheWO3i+22a+EDPlIKQkEgID7FmKTL7kD0Z5r/Vs2L3lKgJQJ7bCnDoYDcj8mKlzlUezNdoLA/l758keONlzOpwVFfLwQqbI369tb3yRfuwN9vOYfNqSGdv/IRZ/QL614DQ2RZeZKPo2RWDq/KxAautgTQTiodGZZrkxs4Y8W0/l8+/1cFN+BaN/6FB76QNkxBQ== my_vps_key"
+
+    echo -e "${GREEN}正在配置 SSH 密钥登录...${PLAIN}"
+
+    # 1. 创建 .ssh 目录
+    if [ ! -d "/root/.ssh" ]; then
+        mkdir -p /root/.ssh
+        chmod 700 /root/.ssh
     fi
-    chmod 700 /root/.ssh
-    chmod 600 /root/.ssh/authorized_keys
-    chattr +i /root/.ssh/authorized_keys
-    chattr +i /root/.ssh
-    echo -e "${GREEN}🎉 搞定！SSH 目录已加锁保护。${PLAIN}"
+
+    # 0. 防止之前版本上过锁，先尝试解锁 (兼容旧逻辑)
+    if command -v chattr &> /dev/null; then
+        chattr -ia /root/.ssh 2>/dev/null
+        chattr -ia /root/.ssh/authorized_keys 2>/dev/null
+    fi
+
+    # 2. 写入公钥 (去重)
+    if grep -qF "$YOUR_PUBLIC_KEY" /root/.ssh/authorized_keys 2>/dev/null; then
+        echo -e "${YELLOW}公钥已存在，跳过写入。${PLAIN}"
+    else
+        echo "$YOUR_PUBLIC_KEY" >> /root/.ssh/authorized_keys
+        chmod 600 /root/.ssh/authorized_keys
+        echo -e "${GREEN}公钥已添加至 ~/.ssh/authorized_keys${PLAIN}"
+    fi
+
+    # 3. 备份配置
+    cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak.$(date +%F_%T)
+    echo -e "${GREEN}已备份 SSH 配置文件。${PLAIN}"
+
+    # 4. 修改配置 (禁用密码，开启公钥)
+    echo -e "${YELLOW}正在加固 SSH 配置 (禁用密码/强制公钥)...${PLAIN}"
+    
+    # PubkeyAuthentication yes
+    if grep -q "^PubkeyAuthentication" /etc/ssh/sshd_config; then
+        sed -i 's/^PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+    else
+        echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config
+    fi
+
+    # PasswordAuthentication no
+    if grep -q "^PasswordAuthentication" /etc/ssh/sshd_config; then
+        sed -i 's/^PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+    else
+        echo "PasswordAuthentication no" >> /etc/ssh/sshd_config
+    fi
+
+    # ChallengeResponseAuthentication no
+    if grep -q "^ChallengeResponseAuthentication" /etc/ssh/sshd_config; then
+        sed -i 's/^ChallengeResponseAuthentication.*/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config
+    else
+        echo "ChallengeResponseAuthentication no" >> /etc/ssh/sshd_config
+    fi
+
+    # 5. 重启服务
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl restart sshd
+        echo -e "${GREEN}SSH 服务已重启。${PLAIN}"
+    else
+        service ssh restart
+        echo -e "${GREEN}SSH 服务已重启。${PLAIN}"
+    fi
+
+    echo -e "${GREEN}=============================================${PLAIN}"
+    echo -e "${GREEN}配置完成！${PLAIN}"
+    echo -e "1. 密码登录已【禁用】。"
+    echo -e "2. 仅允许拥有私钥的用户登录。"
+    echo -e "${RED}警告：请不要关闭当前窗口！${PLAIN}"
+    echo -e "请立刻打开一个新的终端窗口尝试连接。如果连不上，你还能在这个窗口把配置改回来。"
+    echo -e "${GREEN}=============================================${PLAIN}"
 }
 
 install_nezha_stealth() {
@@ -205,20 +261,12 @@ install_nezha_stealth() {
     echo -e "${GREEN}🎉 伪装完成！进程名: $NEW_NAME${PLAIN}"
 }
 
-# 18. 清理痕迹 (New)
 clean_traces() {
     echo -e "${YELLOW}正在清理命令历史记录...${PLAIN}"
-    
-    # 1. 清空当前内存记录
     history -c
-    
-    # 2. 清空硬盘记录文件
     > ~/.bash_history
-    
-    # 额外：如果有 Zsh 或 MySQL 历史，顺手也清了
     if [ -f ~/.zsh_history ]; then > ~/.zsh_history; fi
     if [ -f ~/.mysql_history ]; then > ~/.mysql_history; fi
-    
     echo -e "${GREEN}✅ 历史记录文件已清空。${PLAIN}"
     echo -e "${YELLOW}注意: 为确保内存缓存彻底清除，建议您立即断开 SSH 并重新登录。${PLAIN}"
 }
@@ -227,7 +275,7 @@ clean_traces() {
 show_menu() {
     clear
     echo -e "${BLUE}################################################${PLAIN}"
-    echo -e "${BLUE}#            个人专属运维脚本 v1.4             #${PLAIN}"
+    echo -e "${BLUE}#            个人专属运维脚本 v1.5             #${PLAIN}"
     echo -e "${BLUE}#        System: ${OS_TYPE}  Arch: ${ARCH}          #${PLAIN}"
     echo -e "${BLUE}################################################${PLAIN}"
     echo -e ""
@@ -246,7 +294,7 @@ show_menu() {
     echo -e " ${GREEN}13.${PLAIN} 进入 /etc/V2bX 目录"
     echo -e " ${GREEN}14.${PLAIN} 安装 SSH 工具箱"
     echo -e " ${GREEN}15.${PLAIN} 杀掉所有 Tmux"
-    echo -e " ${GREEN}16.${PLAIN} 一键添加公钥"
+    echo -e " ${GREEN}16.${PLAIN} 一键添加公钥 (禁密码)"
     echo -e " ${GREEN}17.${PLAIN} 一键上针+伪装"
     echo -e " ${GREEN}18.${PLAIN} 清理痕迹 (History)"
     echo -e " ${GREEN}0.${PLAIN} 退出"
