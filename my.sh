@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # =========================================================
-# 个人专属运维脚本 - Clean Edition v1.7
+# 个人专属运维脚本 - Clean Edition v1.8
 # 适配: Debian/Ubuntu/CentOS/Alpine/macOS/Windows
 # =========================================================
 
-# --- 颜色定义 (扩充了调色板) ---
+# --- 颜色定义 ---
 RED='\033[31m'
 GREEN='\033[32m'
 YELLOW='\033[33m'
@@ -83,23 +83,19 @@ run_kejilion_cn() {
 
 oracle_firewall() {
     if [[ "$OS_TYPE" != "debian" && "$OS_TYPE" != "centos" && "$OS_TYPE" != "alpine" ]]; then echo -e "${RED}仅限 Linux。${PLAIN}"; return; fi
-    
     systemctl stop firewalld.service 2>/dev/null
     systemctl disable firewalld.service 2>/dev/null
     rc-service firewalld stop 2>/dev/null
-    
     iptables -P INPUT ACCEPT
     iptables -P FORWARD ACCEPT
     iptables -P OUTPUT ACCEPT
     iptables -F
-    
     netfilter-persistent save 2>/dev/null || service iptables save 2>/dev/null
     echo -e "${GREEN}✅ 防火墙规则已重置并全放行。${PLAIN}"
 }
 
 install_fail2ban() {
     echo -e "${YELLOW}正在配置 Fail2Ban (永久封禁策略)...${PLAIN}"
-    # 1. 识别系统并安装
     local LOCAL_OS="unknown"
     if command -v apk >/dev/null; then
         LOCAL_OS="alpine"
@@ -114,7 +110,6 @@ install_fail2ban() {
         echo -e "${RED}无法自动安装，请手动安装 Fail2Ban。${PLAIN}"; return
     fi
 
-    # 2. 写入配置
     cat > /etc/fail2ban/jail.local <<EOF
 [DEFAULT]
 ignoreip = 127.0.0.1/8 ::1
@@ -130,8 +125,6 @@ EOF
         echo "logpath = /var/log/messages" >> /etc/fail2ban/jail.local
         echo "backend = auto" >> /etc/fail2ban/jail.local
     fi
-
-    # 3. 启动
     if command -v systemctl >/dev/null; then
         systemctl enable fail2ban && systemctl restart fail2ban
     elif command -v rc-service >/dev/null; then
@@ -178,7 +171,6 @@ add_ssh_key() {
         echo -e "${GREEN}✅ 公钥已添加。${PLAIN}"
     fi
     
-    # 强化配置
     cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak.$(date +%F_%T)
     sed -i 's/^PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null || echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config
     sed -i 's/^PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config 2>/dev/null || echo "PasswordAuthentication no" >> /etc/ssh/sshd_config
@@ -216,11 +208,60 @@ create_shortcut() {
     echo -e "${GREEN}✅ 快捷键设置成功！输入 'y' 即可使用。${PLAIN}"
 }
 
+# 13. Kimi 一键启动
+run_kimi_boot() {
+    if [[ "$OS_TYPE" == "windows" ]]; then echo -e "${RED}不支持 Windows。${PLAIN}"; return; fi
+    echo -e "${YELLOW}🚀 正在部署 Kimi Python 环境 (全系统自动适配)...${PLAIN}"
+
+    # 1. 安装编译依赖
+    case "${OS_TYPE}" in
+        debian)
+            apt update && apt install -y python3 python3-pip python3-venv build-essential libssl-dev libffi-dev python3-dev
+            ;;
+        centos)
+            if command -v dnf &> /dev/null; then PKG="dnf"; else PKG="yum"; fi
+            $PKG install -y epel-release
+            $PKG install -y python3 python3-pip python3-devel gcc openssl-devel libffi-devel make
+            ;;
+        alpine)
+            apk update && apk add --no-cache python3 py3-pip python3-dev build-base libffi-dev openssl-dev
+            ;;
+        *)
+            echo -e "${RED}未知系统，尝试通用安装...${PLAIN}"
+            apt install -y python3 python3-pip python3-venv build-essential 2>/dev/null
+            ;;
+    esac
+
+    # 2. 虚拟环境
+    if [ ! -d "venv" ]; then
+        echo -e "${YELLOW}正在创建虚拟环境 venv...${PLAIN}"
+        python3 -m venv venv
+    else
+        echo -e "${GREEN}检测到现有虚拟环境，跳过创建。${PLAIN}"
+    fi
+
+    # 3. 安装依赖
+    echo -e "${YELLOW}正在安装 Python 依赖 (清华源)...${PLAIN}"
+    ./venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade pip
+    ./venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple aiohttp aiosqlite colorama asyncssh paramiko requests
+    if [ -f "requirements.txt" ]; then ./venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt; fi
+
+    # 4. 运行
+    if [ -f "main.py" ]; then
+        echo -e "${GREEN}✅ 部署完成，启动 main.py ...${PLAIN}"
+        chmod +x main.py
+        ./venv/bin/python main.py --attack
+    else
+        echo -e "${RED}❌ 错误：当前目录下未找到 main.py！${PLAIN}"
+        echo -e "请确保您在项目根目录下运行此命令。"
+    fi
+}
+
 # --- 新版 UI 界面 ---
 show_menu() {
     clear
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${PLAIN}"
-    echo -e "${BLUE}▐${PLAIN}  ${PURPLE}个人专属运维工具箱${PLAIN} ${YELLOW}v1.7${PLAIN}                        ${BLUE}▌${PLAIN}"
+    echo -e "${BLUE}▐${PLAIN}  ${PURPLE}个人专属运维工具箱${PLAIN} ${YELLOW}v1.8${PLAIN}                        ${BLUE}▌${PLAIN}"
     echo -e "${BLUE}▐${PLAIN}  系统: ${OS_TYPE} | 架构: ${ARCH}                    ${BLUE}▌${PLAIN}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${PLAIN}"
     echo -e ""
@@ -243,16 +284,17 @@ show_menu() {
     echo -e "  ${CYAN}9.${PLAIN} 哪吒探针 + 进程伪装"
     echo -e ""
 
-    echo -e "${YELLOW}▌ 🔧 面板与维护${PLAIN}"
+    echo -e "${YELLOW}▌ 🔧 维护与项目${PLAIN}"
     echo -e "  ${CYAN}10.${PLAIN} 配置 V2bX 后端"
     echo -e "  ${CYAN}11.${PLAIN} 杀掉所有 Tmux 会话"
     echo -e "  ${CYAN}12.${PLAIN} 设置快捷键 'y'"
+    echo -e "  ${CYAN}13.${PLAIN} Kimi 一键启动 (部署+运行)"
     echo -e ""
 
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${PLAIN}"
     echo -e "  ${RED}0. 退出脚本${PLAIN}"
     echo -e ""
-    read -p " 请输入选项 [0-12]: " choice
+    read -p " 请输入选项 [0-13]: " choice
 
     case $choice in
         1) run_kejilion_global ;;
@@ -267,6 +309,7 @@ show_menu() {
         10) install_v2bx_backend ;;
         11) kill_tmux ;;
         12) create_shortcut ;;
+        13) run_kimi_boot ;;
         0) exit 0 ;;
         *) echo -e "${RED}无效选项，请重试。${PLAIN}" ;;
     esac
