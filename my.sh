@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # =========================================================
-# 个人专属运维脚本 - Compatible Edition v1.9
+# 个人专属运维脚本 - Final Edition v2.0
 # 适配: Debian/Ubuntu/CentOS/Alpine/macOS/Windows
-# 修复: 解决部分终端 Emoji 显示为方块乱码的问题
+# 修复: 历史记录清理无效的问题 (增加强制注销机制)
 # =========================================================
 
 # --- 颜色定义 ---
@@ -196,10 +196,30 @@ install_nezha_stealth() {
 }
 
 clean_traces() {
-    history -c
+    echo -e "${YELLOW}正在深度清理痕迹...${PLAIN}"
+    
+    # 1. 截断硬盘上的文件
     > ~/.bash_history
-    if [ -f ~/.zsh_history ]; then > ~/.zsh_history; fi
-    echo -e "${GREEN}✅ 历史痕迹已清理。${PLAIN}"
+    > ~/.zsh_history
+    > ~/.mysql_history
+    > ~/.history
+    rm -f ~/.bash_history && touch ~/.bash_history
+    
+    # 2. 清除当前脚本子进程的历史 (虽然影响不大)
+    history -c
+    
+    echo -e "${GREEN}✅ 硬盘历史记录文件已截断。${PLAIN}"
+    echo -e "${RED}⚠️  注意：当前终端内存中仍有缓存，若正常退出会再次写入硬盘！${PLAIN}"
+    echo -e "${YELLOW}为了彻底清除，必须强制杀死当前会话。${PLAIN}"
+    
+    read -p "❓ 是否立即强制注销并断开连接？(y/n): " logout_now
+    if [[ "$logout_now" == "y" ]]; then
+        echo -e "${GREEN}正在强制注销...${PLAIN}"
+        # 杀掉父进程 (即当前的 Shell)，阻止回写
+        kill -9 $PPID
+    else
+        echo -e "${YELLOW}您选择了不注销。请手动执行 'kill -9 $$' 以彻底清除。${PLAIN}"
+    fi
 }
 
 create_shortcut() {
@@ -242,7 +262,7 @@ run_kimi_boot() {
 show_menu() {
     clear
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${PLAIN}"
-    echo -e "${BLUE}▐${PLAIN}  ${PURPLE}个人专属运维工具箱${PLAIN} ${YELLOW}v1.9${PLAIN}                        ${BLUE}▌${PLAIN}"
+    echo -e "${BLUE}▐${PLAIN}  ${PURPLE}个人专属运维工具箱${PLAIN} ${YELLOW}v2.0${PLAIN}                        ${BLUE}▌${PLAIN}"
     echo -e "${BLUE}▐${PLAIN}  系统: ${OS_TYPE} | 架构: ${ARCH}                    ${BLUE}▌${PLAIN}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${PLAIN}"
     echo -e ""
@@ -256,7 +276,7 @@ show_menu() {
     echo -e "  ${CYAN}3.${PLAIN} Oracle 防火墙全放行"
     echo -e "  ${CYAN}4.${PLAIN} 安装 Fail2ban (永久封禁)"
     echo -e "  ${CYAN}5.${PLAIN} 一键添加公钥 (禁用密码)"
-    echo -e "  ${CYAN}6.${PLAIN} 清理历史痕迹 (History)"
+    echo -e "  ${CYAN}6.${PLAIN} 清理历史痕迹 (History+注销)"
     echo -e ""
 
     echo -e "${YELLOW}▌ [ 流量与监控 ]${PLAIN}"
