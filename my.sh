@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # =========================================================
-# 个人专属运维脚本 - Clean Edition v1.8
+# 个人专属运维脚本 - Compatible Edition v1.9
 # 适配: Debian/Ubuntu/CentOS/Alpine/macOS/Windows
+# 修复: 解决部分终端 Emoji 显示为方块乱码的问题
 # =========================================================
 
 # --- 颜色定义 ---
@@ -208,83 +209,63 @@ create_shortcut() {
     echo -e "${GREEN}✅ 快捷键设置成功！输入 'y' 即可使用。${PLAIN}"
 }
 
-# 13. Kimi 一键启动
 run_kimi_boot() {
     if [[ "$OS_TYPE" == "windows" ]]; then echo -e "${RED}不支持 Windows。${PLAIN}"; return; fi
     echo -e "${YELLOW}🚀 正在部署 Kimi Python 环境 (全系统自动适配)...${PLAIN}"
 
-    # 1. 安装编译依赖
     case "${OS_TYPE}" in
-        debian)
-            apt update && apt install -y python3 python3-pip python3-venv build-essential libssl-dev libffi-dev python3-dev
-            ;;
+        debian) apt update && apt install -y python3 python3-pip python3-venv build-essential libssl-dev libffi-dev python3-dev ;;
         centos)
             if command -v dnf &> /dev/null; then PKG="dnf"; else PKG="yum"; fi
-            $PKG install -y epel-release
-            $PKG install -y python3 python3-pip python3-devel gcc openssl-devel libffi-devel make
+            $PKG install -y epel-release && $PKG install -y python3 python3-pip python3-devel gcc openssl-devel libffi-devel make
             ;;
-        alpine)
-            apk update && apk add --no-cache python3 py3-pip python3-dev build-base libffi-dev openssl-dev
-            ;;
-        *)
-            echo -e "${RED}未知系统，尝试通用安装...${PLAIN}"
-            apt install -y python3 python3-pip python3-venv build-essential 2>/dev/null
-            ;;
+        alpine) apk update && apk add --no-cache python3 py3-pip python3-dev build-base libffi-dev openssl-dev ;;
+        *) apt install -y python3 python3-pip python3-venv build-essential 2>/dev/null ;;
     esac
 
-    # 2. 虚拟环境
-    if [ ! -d "venv" ]; then
-        echo -e "${YELLOW}正在创建虚拟环境 venv...${PLAIN}"
-        python3 -m venv venv
-    else
-        echo -e "${GREEN}检测到现有虚拟环境，跳过创建。${PLAIN}"
-    fi
+    if [ ! -d "venv" ]; then python3 -m venv venv; fi
 
-    # 3. 安装依赖
-    echo -e "${YELLOW}正在安装 Python 依赖 (清华源)...${PLAIN}"
     ./venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade pip
     ./venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple aiohttp aiosqlite colorama asyncssh paramiko requests
     if [ -f "requirements.txt" ]; then ./venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt; fi
 
-    # 4. 运行
     if [ -f "main.py" ]; then
         echo -e "${GREEN}✅ 部署完成，启动 main.py ...${PLAIN}"
         chmod +x main.py
         ./venv/bin/python main.py --attack
     else
         echo -e "${RED}❌ 错误：当前目录下未找到 main.py！${PLAIN}"
-        echo -e "请确保您在项目根目录下运行此命令。"
     fi
 }
 
-# --- 新版 UI 界面 ---
+# --- 新版 UI 界面 (ASCII 兼容) ---
 show_menu() {
     clear
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${PLAIN}"
-    echo -e "${BLUE}▐${PLAIN}  ${PURPLE}个人专属运维工具箱${PLAIN} ${YELLOW}v1.8${PLAIN}                        ${BLUE}▌${PLAIN}"
+    echo -e "${BLUE}▐${PLAIN}  ${PURPLE}个人专属运维工具箱${PLAIN} ${YELLOW}v1.9${PLAIN}                        ${BLUE}▌${PLAIN}"
     echo -e "${BLUE}▐${PLAIN}  系统: ${OS_TYPE} | 架构: ${ARCH}                    ${BLUE}▌${PLAIN}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${PLAIN}"
     echo -e ""
     
-    echo -e "${YELLOW}▌ 🚀 脚本集成${PLAIN}"
+    echo -e "${YELLOW}▌ [ 脚本集成 ]${PLAIN}"
     echo -e "  ${CYAN}1.${PLAIN} 运行 科技Lion (国外源)"
     echo -e "  ${CYAN}2.${PLAIN} 运行 科技Lion (国内源)"
     echo -e ""
 
-    echo -e "${YELLOW}▌ 🛡️  系统安全${PLAIN}"
+    echo -e "${YELLOW}▌ [ 系统安全 ]${PLAIN}"
     echo -e "  ${CYAN}3.${PLAIN} Oracle 防火墙全放行"
     echo -e "  ${CYAN}4.${PLAIN} 安装 Fail2ban (永久封禁)"
     echo -e "  ${CYAN}5.${PLAIN} 一键添加公钥 (禁用密码)"
     echo -e "  ${CYAN}6.${PLAIN} 清理历史痕迹 (History)"
     echo -e ""
 
-    echo -e "${YELLOW}▌ ⚡ 流量与监控${PLAIN}"
+    echo -e "${YELLOW}▌ [ 流量与监控 ]${PLAIN}"
     echo -e "  ${CYAN}7.${PLAIN} 部署 Traffmonetizer (AMD64)"
     echo -e "  ${CYAN}8.${PLAIN} 部署 Traffmonetizer (ARM64)"
     echo -e "  ${CYAN}9.${PLAIN} 哪吒探针 + 进程伪装"
     echo -e ""
 
-    echo -e "${YELLOW}▌ 🔧 维护与项目${PLAIN}"
+    echo -e "${YELLOW}▌ [ 维护与项目 ]${PLAIN}"
     echo -e "  ${CYAN}10.${PLAIN} 配置 V2bX 后端"
     echo -e "  ${CYAN}11.${PLAIN} 杀掉所有 Tmux 会话"
     echo -e "  ${CYAN}12.${PLAIN} 设置快捷键 'y'"
