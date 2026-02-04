@@ -1,9 +1,10 @@
 #!/bin/bash
 
 # =========================================================
-# 个人专属运维脚本 - Docker Edition v2.2
+# 个人专属运维脚本 - Docker Edition v2.3
 # 适配: Debian / Ubuntu / CentOS / Alpine / macOS
 # 特性: 新增 Docker 环境自动检测与修复，防止安装失败
+#       新增 Logrotate 日志自动清理功能
 # =========================================================
 
 # --- 颜色定义 ---
@@ -290,12 +291,67 @@ run_kimi_boot() {
     fi
 }
 
+# 15. 配置 Logrotate (新功能)
+configure_log_cleaner() {
+    echo -e "${YELLOW}正在配置日志自动清理策略 (Logrotate)...${PLAIN}"
+    echo -e "说明: 此功能将对指定目录下的 .log 文件设置 1G 上限，超过即清理。"
+    
+    read -p "请输入日志所在的绝对路径 (例如 /root/test/logs): " target_dir
+
+    # 1. 检查目录是否存在
+    if [ ! -d "$target_dir" ]; then
+        echo -e "${RED}错误: 目录 $target_dir 不存在，请检查路径是否正确！${PLAIN}"
+        return
+    fi
+
+    # 2. 生成配置文件的名称 (使用目录名作为标识，防止冲突)
+    safe_name=$(echo "$target_dir" | sed 's/\//_/g' | sed 's/^_//')
+    config_file="/etc/logrotate.d/custom_limit_${safe_name}"
+
+    # 3. 写入 Logrotate 配置
+    # copytruncate: 关键参数，保证不重启 Python 程序也能释放空间
+    cat > "$config_file" <<EOF
+$target_dir/*.log {
+    size 1G
+    rotate 1
+    compress
+    missingok
+    notifempty
+    copytruncate
+    dateext
+}
+EOF
+
+    # 4. 验证并反馈
+    if [ -f "$config_file" ]; then
+        echo -e "${GREEN}✅ 配置已写入: $config_file${PLAIN}"
+        echo -e "策略内容: 目录 [$target_dir] 下的 .log 文件超过 1G 将自动轮转。"
+        
+        # 询问是否立即测试
+        read -p "是否立即进行一次测试运行? (y/n): " run_test
+        if [[ "$run_test" == "y" ]]; then
+            echo "正在强制执行 Logrotate 测试..."
+            # 兼容不同系统的 logrotate 路径
+            if command -v /usr/sbin/logrotate >/dev/null; then
+                 /usr/sbin/logrotate -vf "$config_file"
+            else
+                 logrotate -vf "$config_file"
+            fi
+            echo -e "${GREEN}✅ 测试完成，请检查日志目录空间是否释放。${PLAIN}"
+        fi
+    else
+        echo -e "${RED}❌ 无法写入配置文件，请检查是否具有 root 权限。${PLAIN}"
+    fi
+    
+    read -p "按任意键返回菜单..."
+}
+
 # --- UI 界面 ---
 show_menu() {
     clear
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${PLAIN}"
-    echo -e "${BLUE}▐${PLAIN}  ${PURPLE}个人专属运维工具箱${PLAIN} ${YELLOW}v2.2${PLAIN}                        ${BLUE}▌${PLAIN}"
-    echo -e "${BLUE}▐${PLAIN}  系统: ${OS_TYPE} | 架构: ${ARCH}                    ${BLUE}▌${PLAIN}"
+    echo -e "${BLUE}▐${PLAIN}  ${PURPLE}个人专属运维工具箱${PLAIN} ${YELLOW}v2.3${PLAIN}                         ${BLUE}▌${PLAIN}"
+    echo -e "${BLUE}▐${PLAIN}  系统: ${OS_TYPE} | 架构: ${ARCH}                     ${BLUE}▌${PLAIN}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${PLAIN}"
     echo -e ""
     
@@ -323,12 +379,13 @@ show_menu() {
     echo -e "  ${CYAN}12.${PLAIN} 设置快捷键 'y'"
     echo -e "  ${CYAN}13.${PLAIN} Kimi 一键启动 (部署+运行)"
     echo -e "  ${CYAN}14.${PLAIN} 安装/修复 Docker 环境"
+    echo -e "  ${CYAN}15.${PLAIN} 配置日志自动清理 (Logrotate 1G限制)"
     echo -e ""
 
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${PLAIN}"
     echo -e "  ${RED}0. 退出脚本${PLAIN}"
     echo -e ""
-    read -p " 请输入选项 [0-14]: " choice
+    read -p " 请输入选项 [0-15]: " choice
 
     case $choice in
         1) run_kejilion_global ;;
@@ -345,6 +402,7 @@ show_menu() {
         12) create_shortcut ;;
         13) run_kimi_boot ;;
         14) install_docker ;;
+        15) configure_log_cleaner ;;
         0) exit 0 ;;
         *) echo -e "${RED}无效选项，请重试。${PLAIN}" ;;
     esac
